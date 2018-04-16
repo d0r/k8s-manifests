@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spinnaker-demo-config
+  namespace: default
+data:
+  NEW_FEATURE: "foo"
+
+---
+
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: spinnaker-demo
+  namespace: default
+  labels:
+    source: demo
+    stack: frontend
+    app: spinnaker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      source: demo
+      app: spinnaker
+  template:
+    metadata:
+      labels:
+        source: demo
+        app: spinnaker
+    spec:
+      containers:
+      - name: primary
+        image: jackpockb.azurecr.io/demoapp:${ parameters['version'] }
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /probes/readiness
+            port: 80
+        envFrom:
+        - configMapRef:
+            name: spinnaker-demo-config
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: spinnaker-demo
+  namespace: default
+  annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  selector:
+    source: demo
+    app: spinnaker
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: LoadBalancer
